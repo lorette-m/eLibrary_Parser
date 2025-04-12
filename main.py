@@ -67,10 +67,10 @@ def search_cycle():
             print("Alert dismissed... Throwing an exception")
             raise AuthorizationException("Ошибка авторизации. Для парсинга необходимо авторизироваться в eLibrary")
 
-        authors_table = browser.find_element(By.ID, 'restab')
-        rows_in_table = authors_table.find_element(By.TAG_NAME, 'tr')
-        if len(rows_in_table) > 4:
-            print('Найдено более одного автора по данному запросу. Уточните полное ФИО или код автора')
+        # authors_table = browser.find_element(By.ID, 'restab')
+        # rows_in_table = authors_table.find_element(By.TAG_NAME, 'tr')
+        # if len(rows_in_table) > 4:
+        #    print('Найдено более одного автора по данному запросу. Уточните полное ФИО или код автора')
 
         # Даём время загрузиться (можно заменить на WebDriverWait)
         time.sleep(2)
