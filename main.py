@@ -11,7 +11,7 @@ from selenium.webdriver.support import expected_conditions as EC
 
 from fake_useragent import UserAgent
 
-### Настройка браузера / user-agent а / установка целевой страницы ### Переменные глобальные!
+### Тут настройка браузера / user-agent а / установка целевой страницы ### Переменные глобальные!
 # Создаём объект для генерации случайных User-Agent’ов
 ua = UserAgent()
 
