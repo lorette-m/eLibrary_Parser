@@ -2,19 +2,19 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.firefox.options import Options
-from selenium.common.exceptions import UnexpectedAlertPresentException
+from selenium.common.exceptions import UnexpectedAlertPresentException, NoSuchElementException, TimeoutException
 
 import time
+import traceback
 from bs4 import BeautifulSoup
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 from fake_useragent import UserAgent
 
-### Тут настройка браузера / user-agent а / установка целевой страницы ### Переменные глобальные!
+### Настройка браузера / user-agent и установка целевой страницы ###
 # Создаём объект для генерации случайных User-Agent’ов
 ua = UserAgent()
-
 options = Options()
 options.add_argument("--disable-infobars")
 options.add_argument(f"--user-agent={ua.random}")  # Устанавливаем случайный User-Agent
@@ -27,21 +27,42 @@ print(f"Using User-Agent: {browser.execute_script('return navigator.userAgent;')
 class AuthorizationException(Exception):
     pass
 
-### Функция поиска. Вызов может повторяться, в т.ч., если найдено >1 автора
+def authorize():
+    try:
+        login_container = browser.find_element(By.ID, 'win_login')
+        print("Пользователь не авторизован. Переходим к авторизации.")
+        
+        login_field = login_container.find_element(By.ID, 'login')
+        password_field = login_container.find_element(By.ID, 'password')
+        
+        user_login = input('Введите логин или почту: ')
+        user_password = input('Введите пароль: ')
+        
+        login_field.clear()
+        login_field.send_keys(user_login)
+        password_field.clear()
+        password_field.send_keys(user_password)
+
+        login_button = login_container.find_element(By.CLASS_NAME, 'butred')
+        login_button.click()
+        
+        time.sleep(2)
+        browser.get('https://www.elibrary.ru/authors.asp')
+        WebDriverWait(browser, 10).until(EC.presence_of_element_located((By.ID, 'surname')))
+        print("Авторизация выполнена.")
+    except Exception as e:
+        print("Ошибка при авторизации:")
+        traceback.print_exc()
+        raise AuthorizationException("Не удалось авторизоваться. Проверьте введенные данные.")
+
 def search_cycle():
     try:
-        # ДОБАВИТЬ ПРОВЕРКУ АВТОРИЗАЦИИ !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        # id = win_login, уже не помню где я его там нашел, можешь чекнуть через поиск в инспекции HTML-кода страницы
-        # этот id общий для формы вроде, на поля там одинаковый id если я не ошибаюсь, нужно придумать как их заполнить
-        # и тыкнуть кнопочку и ура пользователь авторизирован
-        # Матвей сделай пж проверку на этот id
-        # я сделал в main (изначально бесконечный) цикл, чтобы при ошибке, можно было заново начать поиск, чтобы не запускать скрипт заново
-        # не знаю оставим этот подход или нет, но пока
-        # нужно сделать проверку есть ли элемент с этим id на сайте :
-        ## если есть - пользователь не авторизован, напиши заполнение этой формы (чтобы данные вводить в консоль) и авторизацию
-        ## если нет - пользователь авторизован, все хорошо, продолжаем выполнение цикла
-        # upd. лучше напиши авторизацию отдельной функцией
-
+        try:
+            browser.find_element(By.ID, 'win_login')
+            authorize()
+        except NoSuchElementException:
+            print("Пользователь уже авторизован.")
+        
         surname_field = browser.find_element(By.ID, 'surname')
 
         surname_to_search = input('Введите фамилию : ')
