@@ -12,6 +12,8 @@ from selenium.webdriver.support import expected_conditions as EC
 
 from fake_useragent import UserAgent
 
+import getpass
+
 ### Настройка браузера / user-agent и установка целевой страницы ###
 # Создаём объект для генерации случайных User-Agent’ов
 ua = UserAgent()
@@ -69,12 +71,12 @@ def search_cycle():
             print("Пользователь уже авторизован.")
         
         surname_field = browser.find_element(By.ID, 'surname')
-
+        surname_field.clear()
         surname_to_search = input('Введите фамилию : ')
         surname_field.send_keys(surname_to_search)
 
         code_field = browser.find_element(By.ID, 'codevalue')
-
+        code_field.clear()
         code_to_search = input('Введите SPIN-код : ')
         code_field.send_keys(code_to_search + Keys.RETURN)
 
