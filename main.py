@@ -20,8 +20,8 @@ options.add_argument(f"--user-agent={ua.random}")  # Устанавливаем 
 browser = webdriver.Firefox(options=options)
 
 # Размер и позиция для правой половины экрана (у меня 1920x1200, масштаб 125%)
-browser.set_window_size(768, 920)  # 960/1.25, 1160/1.25
-browser.set_window_position(768, 0)  # (960-12)/1.25 Имитация перемещения окна
+browser.set_window_size(768, 918)
+browser.set_window_position(768, 0)
 
 browser.get('https://www.elibrary.ru/authors.asp')
 print(f"Using User-Agent: {browser.execute_script('return navigator.userAgent;')}")  # Проверка User-Agent
@@ -49,9 +49,9 @@ def authorize():
         login_field = login_container.find_element(By.ID, 'login')
         password_field = login_container.find_element(By.ID, 'password')
 
-        # Мои учетные данные для автозаполнения
-        user_login = "Loretta Mosshart"
-        user_password = "lory_study"
+        # Можно указать учетные данные для автозаполнения
+        user_login = ""
+        user_password = ""
 
         #user_login = input('Введите логин или почту: ')
         #user_password = input('Введите пароль: ')
@@ -90,6 +90,21 @@ def search_cycle():
     NB: В графу "Фамилия" можно указать полное ФИО, допустимо пропустить SPIN-код, но тогда может быть несколько авторов с одинаковым ФИО.
     """
     try:
+        ### Проверки на случай повторных итераций в цикле main
+
+        # Проверяем, находимся ли на начальной странице, если нет — переходим
+        if browser.current_url != 'https://www.elibrary.ru/authors.asp':
+            browser.get('https://www.elibrary.ru/authors.asp')
+            print("Перешли на начальную страницу.")
+
+        # Закрываем все лишние вкладки, оставляем только основную
+        if len(browser.window_handles) > 1:
+            for window_handle in browser.window_handles[1:]:
+                browser.switch_to.window(window_handle)
+                browser.close()
+            browser.switch_to.window(browser.window_handles[0])
+            print("Закрыты лишние вкладки.")
+
         try:
             browser.find_element(By.ID, 'win_login')
             authorize()
@@ -256,13 +271,18 @@ def search_cycle():
             if not checkbox.is_selected():  # Проверяем, не стоит ли галочка
                 checkbox.click()
 
-        search_button = WebDriverWait(browser, 15).until(
-            EC.element_to_be_clickable((
-                By.XPATH,
-                '//div[contains(@class, "butred") and contains(@onclick, "pub_search()")]'
-            ))
+        container = WebDriverWait(browser, 15).until(
+            EC.presence_of_element_located((By.ID, 'show_param'))
         )
-        search_button.click()
+        search_button = container.find_element(
+            By.XPATH,
+            './/div[contains(@class, "butred") and contains(@onclick, "pub_search()")]'
+        )
+        browser.execute_script("arguments[0].click();", search_button)
+
+        with open("page.html", "w", encoding="utf-8") as f:
+            f.write(browser.page_source)
+        print("Страница сохранена в page.html")
 
         return publications_total_elib, publications_rinc, publications_rinc_core
     except AuthorizationException:
@@ -271,10 +291,12 @@ def search_cycle():
         raise
     except Exception as e:
         print(f"Неожиданная ошибка: {e}")
-        return None
+        browser.get('https://www.elibrary.ru/authors.asp')
+        print("Перешли на начальную страницу из-за ошибки.")
+        raise
 
 def main():
-    loop_limit = 1
+    loop_limit = 3
     loop_iteration = 0
     while loop_iteration < loop_limit:
         try:
