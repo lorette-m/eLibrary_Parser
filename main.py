@@ -185,13 +185,15 @@ def search_cycle():
         publications_rinc_core = WebDriverWait(browser, 15).until(
             EC.presence_of_element_located((
                 By.XPATH,
-                '//a[contains(@href, "author_items.asp") and contains(@title, "Список публикаций данного автора, входящих в ядро РИНЦ")]'
+                '//a[contains(@href, "author_items.asp") and contains(@title, "Список публикаций автора, входящих в ядро РИНЦ")]'
             ))
         ).text
 
         browser.back()
 
         ### Переходим на страницу с публикациями в РИНЦ
+
+        print("Переходим на страницу с публикациями в РИНЦ...")
 
         rinc_link = WebDriverWait(browser, 15).until(
             EC.element_to_be_clickable((
@@ -218,7 +220,7 @@ def search_cycle():
         types_header.click()
 
         checkbox_articles = WebDriverWait(browser, 15).until(
-            EC.element_to_be_clickable((By.ID, 'types_4'))
+            EC.element_to_be_clickable((By.ID, 'types_RAR'))
         )
         checkbox_articles.click()
 
