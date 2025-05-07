@@ -10,6 +10,9 @@ from fake_useragent import UserAgent
 
 import getpass
 
+import csv
+from bs4 import BeautifulSoup
+
 ### Настройка браузера / user-agent и установка целевой страницы ###
 # Создаём объект для генерации случайных User-Agent’ов
 ua = UserAgent()
@@ -297,6 +300,44 @@ def search_cycle():
         print("Перешли на начальную страницу из-за ошибки.")
         raise
 
+class Article:
+    def __init__(self, number, name):
+        self.number = number
+        self.name = name
+    def write_down(self):
+        line = self.number + " " + self.name
+        return line
+
+def parse_elibrary_html(html_path, csv_path, publications_total_elib, publications_rinc, publications_rinc_core):
+    with open(html_path, encoding='utf-8') as f:
+        soup = BeautifulSoup(f, 'html.parser')
+
+    lines = soup.find('table', id='restab').find_all('b')
+    articles = []
+    current_number = 0
+    for line in lines:
+        if(current_number < 3):
+            current_number += 1
+            continue
+        elif(current_number % 2 != 0):
+            number = line.text.replace('\n', ' ').strip()
+        else:
+            name = line.text.replace('\n', ' ').strip()
+            articles.append(Article(number, name))
+        current_number += 1
+
+    result = []
+    for i in articles:
+        result.append(i.write_down())
+
+    with open(csv_path, 'w', encoding='utf-8', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow([f"Число публикаций на elibrary.ru: {publications_total_elib}"])
+        writer.writerow([f"Число публикаций в РИНЦ: {publications_rinc}"])
+        writer.writerow([f"Число публикаций, входящих в ядро РИНЦ: {publications_rinc_core}"])
+        for row in result:
+            writer.writerow([row])
+
 def main():
     loop_limit = 3
     loop_iteration = 0
@@ -310,6 +351,7 @@ def main():
                 print(f"Число публикаций на elibrary.ru: {publications_total_elib}\n"
                       f"Число публикаций в РИНЦ: {publications_rinc}\n"
                       f"Число публикаций, входящих в ядро РИНЦ: {publications_rinc_core}")
+                parse_elibrary_html('page.html', 'result.csv', publications_total_elib, publications_rinc, publications_rinc_core)
                 break
         except AuthorizationException as e:
             print(f"Ошибка авторизации: {e}")
@@ -326,3 +368,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
