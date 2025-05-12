@@ -1,3 +1,5 @@
+import os
+
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -77,7 +79,7 @@ def authorize():
         login_button = login_container.find_element(By.CLASS_NAME, 'butred')
         login_button.click()
 
-        WebDriverWait(browser, 10).until(EC.presence_of_element_located((By.ID, 'surname')))
+        WebDriverWait(browser, 5).until(EC.presence_of_element_located((By.ID, 'surname')))
         print("Авторизация выполнена.")
     except (TimeoutException, NoSuchElementException) as e:
         raise AuthorizationException("Не удалось авторизоваться. Проверьте элементы формы.") from e
@@ -283,7 +285,13 @@ def search_cycle():
             By.XPATH,
             './/div[contains(@class, "butred") and contains(@onclick, "pub_search()")]'
         )
+
+        old_table = browser.find_element(By.ID, 'restab')
+
         browser.execute_script("arguments[0].click();", search_button)
+
+        WebDriverWait(browser, 15).until(EC.staleness_of(old_table))
+        WebDriverWait(browser, 15).until(EC.presence_of_element_located((By.ID, 'restab')))
 
         with open("page.html", "w", encoding="utf-8") as f:
             f.write(browser.page_source)
@@ -309,6 +317,13 @@ class Article:
         return line
 
 def parse_elibrary_html(html_path, csv_path, publications_total_elib, publications_rinc, publications_rinc_core):
+    """
+    Функция, выполняющая парсинг сохраненной ранее веб-страницы.
+     1. Чтение файла.
+     2. Сбор информации с веб-страницы (названия всех выбранных статей).
+     3. Структурирование собранных данных.
+     4. Запись в csv-файл.
+    """
     with open(html_path, encoding='utf-8') as f:
         soup = BeautifulSoup(f, 'html.parser')
 
@@ -339,6 +354,15 @@ def parse_elibrary_html(html_path, csv_path, publications_total_elib, publicatio
             writer.writerow([row])
 
 def main():
+    for file in ["page.html", "result.csv"]:
+        try:
+            if os.path.exists(file):
+                os.remove(file)
+                print(f"Файл {file} удален.")
+            else:
+                print(f"Файл {file} не существует, пропускаем удаление.")
+        except Exception as e:
+            print(f"Ошибка при удалении файла {file}: {e}")
     loop_limit = 3
     loop_iteration = 0
     while loop_iteration < loop_limit:
@@ -368,4 +392,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
