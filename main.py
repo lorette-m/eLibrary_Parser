@@ -317,6 +317,13 @@ class Article:
         return line
 
 def parse_elibrary_html(html_path, csv_path, publications_total_elib, publications_rinc, publications_rinc_core):
+    """
+    Функция, выполняющая парсинг сохраненной ранее веб-страницы.
+     1. Чтение файла.
+     2. Сбор информации с веб-страницы (названия всех выбранных статей).
+     3. Структурирование собранных данных.
+     4. Запись в csv-файл.
+    """
     with open(html_path, encoding='utf-8') as f:
         soup = BeautifulSoup(f, 'html.parser')
 
@@ -385,4 +392,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
