@@ -1,4 +1,5 @@
 import os
+import re
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -10,7 +11,7 @@ from selenium.webdriver.support import expected_conditions as EC
 
 from fake_useragent import UserAgent
 
-import getpass
+# import getpass
 
 import csv
 from bs4 import BeautifulSoup
@@ -50,7 +51,7 @@ def authorize():
     try:
         login_container = browser.find_element(By.ID, 'win_login')
         print("Пользователь не авторизован. Переходим к авторизации...")
-        
+
         login_field = login_container.find_element(By.ID, 'login')
         password_field = login_container.find_element(By.ID, 'password')
 
@@ -116,11 +117,11 @@ def search_cycle():
         except NoSuchElementException:
             print("Пользователь уже авторизован.")
 
-        surname_field = WebDriverWait(browser, 10).until(
+        surname_field = WebDriverWait(browser, 5).until(
             EC.presence_of_element_located((By.ID, 'surname'))
         )
         surname_field.clear()
-        code_field = WebDriverWait(browser, 10).until(
+        code_field = WebDriverWait(browser, 5).until(
             EC.presence_of_element_located((By.ID, 'codevalue'))
         )
         code_field.clear()
@@ -291,7 +292,7 @@ def search_cycle():
         browser.execute_script("arguments[0].click();", search_button)
 
         WebDriverWait(browser, 15).until(EC.staleness_of(old_table))
-        WebDriverWait(browser, 15).until(EC.presence_of_element_located((By.ID, 'restab')))
+        WebDriverWait(browser, 30).until(EC.presence_of_element_located((By.ID, 'restab')))
 
         with open("page.html", "w", encoding="utf-8") as f:
             f.write(browser.page_source)
@@ -318,40 +319,122 @@ class Article:
 
 def parse_elibrary_html(html_path, csv_path, publications_total_elib, publications_rinc, publications_rinc_core):
     """
-    Функция, выполняющая парсинг сохраненной ранее веб-страницы.
-     1. Чтение файла.
-     2. Сбор информации с веб-страницы (названия всех выбранных статей).
-     3. Структурирование собранных данных.
-     4. Запись в csv-файл.
+    Функция для парсинга сохранённой веб-страницы со списком статей.
+    Извлекает: номер, авторов, название, журнал, дополнительную информацию (год, том, номер, страницы).
+    Записывает данные в CSV, сохраняя структуру сайта.
     """
-    with open(html_path, encoding='utf-8') as f:
-        soup = BeautifulSoup(f, 'html.parser')
+    try:
+        with open(html_path, encoding='utf-8', errors='ignore') as f:
+            soup = BeautifulSoup(f, 'html.parser')
+    except Exception as e:
+        raise ValueError(f"Ошибка при чтении файла {html_path}: {e}")
 
-    lines = soup.find('table', id='restab').find_all('b')
+    # Находим таблицу
+    table = soup.find('table', id='restab')
+    if not table:
+        raise ValueError("Таблица с id='restab' не найдена в HTML.")
+
+    # Находим все строки таблицы
+    rows = table.find_all('tr', attrs={'valign': 'middle'})
+    if not rows:
+        raise ValueError("Строки таблицы не найдены.")
+
     articles = []
-    current_number = 0
-    for line in lines:
-        if(current_number < 3):
-            current_number += 1
+    for row in rows:
+        # Находим ячейки
+        cells = row.find_all('td')
+        if len(cells) < 3:
+            print(f"Пропущена строка с недостаточным количеством ячеек: {len(cells)}")
             continue
-        elif(current_number % 2 != 0):
-            number = line.text.replace('\n', ' ').strip()
+
+        # Номер статьи
+        number_cell = cells[0].find('font', color="#00008f")
+        print(f"number_cell for row: {number_cell}")  # Отладка
+        number = number_cell.find('b').text.strip() if number_cell and number_cell.find('b') else ''
+        print(f"Extracted number: '{number}'")  # Отладка
+        if not number:
+            print(f"Номер не найден в строке, пытаемся продолжить")
+
+        # Основная информация
+        info_cell = cells[1]
+
+        # Название статьи
+        title = ''
+        title_tag = info_cell.find('a', href=lambda x: x and '/item.asp?id=' in x)
+        if title_tag and title_tag.find('b'):
+            title = title_tag.find('b').text.strip()
         else:
-            name = line.text.replace('\n', ' ').strip()
-            articles.append(Article(number, name))
-        current_number += 1
+            # Проверяем <b><font color="#00008f">...</font></b> для альтернативного названия
+            alt_title_tag = info_cell.find('b')
+            if alt_title_tag and alt_title_tag.find('font', color="#00008f"):
+                title = alt_title_tag.find('font', color="#00008f").text.strip()
+            else:
+                print(f"Название не найдено в строке с номером {number or 'unknown'}, оставляем пустым")
 
-    result = []
-    for i in articles:
-        result.append(i.write_down())
+        # Авторы (только из <i>)
+        authors = ''
+        font_tags = info_cell.find_all('font', color="#00008f")
+        print(f"font_tags for row {number or 'unknown'}: {[str(tag)[:100] for tag in font_tags]}")  # Отладка
+        for font_tag in font_tags:
+            authors_tag = font_tag.find('i')
+            if authors_tag:
+                authors = authors_tag.text.strip()
+                break
+        if not authors:
+            print(f"Авторы не найдены в строке с номером {number or 'unknown'}, оставляем пустым")
 
-    with open(csv_path, 'w', encoding='utf-8', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerow([f"Число публикаций на elibrary.ru: {publications_total_elib}"])
-        writer.writerow([f"Число публикаций в РИНЦ: {publications_rinc}"])
-        writer.writerow([f"Число публикаций, входящих в ядро РИНЦ: {publications_rinc_core}"])
-        for row in result:
-            writer.writerow([row])
+        # Журнал и дополнительная информация
+        journal = ''
+        additional_info = ''
+        for font_tag in font_tags:
+            journal_tag = font_tag.find('a', href=lambda x: x and ('contents.asp?id=' in str(x) or 'contents.asp?titleid=' in str(x)) and '&selid' not in str(x))
+            print(f"journal_tag for font_tag: {journal_tag}")  # Отладка
+            if journal_tag:
+                journal = journal_tag.text.strip()
+                full_text = font_tag.get_text(separator=" ").strip()
+                journal_text = journal_tag.text.strip()
+                start_pos = full_text.find(journal_text) + len(journal_text)
+                additional_info = full_text[start_pos:].strip()
+                break
+        if not journal:
+            print(f"Журнал не найден в строке с номером {number or 'unknown'}, оставляем пустым")
+
+        # Записываем строку, если есть хотя бы одно поле
+        if journal or authors or title or additional_info:
+            articles.append({
+                'number': number,
+                'authors': authors,
+                'title': title,
+                'journal': journal,
+                'additional_info': additional_info
+            })
+        else:
+            print(f"Пропущена строка с номером {number or 'unknown'}: нет ни журнала, ни авторов, ни названия, ни доп. информации")
+
+    if not articles:
+        print("Внимание: не удалось извлечь ни одной статьи из таблицы.")
+
+    # Запись в CSV
+    try:
+        with open(csv_path, 'w', encoding='utf-8', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([f"Число публикаций на elibrary.ru: {publications_total_elib}"])
+            writer.writerow([f"Число публикаций в РИНЦ: {publications_rinc}"])
+            writer.writerow([f"Число публикаций, входящих в ядро РИНЦ: {publications_rinc_core}"])
+            writer.writerow([])
+            writer.writerow(['Номер', 'Авторы', 'Название', 'Журнал', 'Дополнительная информация'])
+            for article in articles:
+                writer.writerow([
+                    article['number'],
+                    article['authors'],
+                    article['title'],
+                    article['journal'],
+                    article['additional_info']
+                ])
+        print(f"Данные сохранены в {csv_path}. Найдено {len(articles)} статей.")
+    except Exception as e:
+        raise ValueError(f"Ошибка при записи в файл {csv_path}: {e}")
+
 
 def main():
     for file in ["page.html", "result.csv"]:
@@ -369,7 +452,6 @@ def main():
         try:
             result = search_cycle()
             if result: # При успешном выполнении выйдет из цикла
-                # Аня, я вернул тебе данные из search_cycle()
                 publications_total_elib, publications_rinc, publications_rinc_core = result
                 print("Функция search_cycle() завершена успешно.")
                 print(f"Число публикаций на elibrary.ru: {publications_total_elib}\n"
