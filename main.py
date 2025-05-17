@@ -56,8 +56,8 @@ def authorize():
         password_field = login_container.find_element(By.ID, 'password')
 
         # Можно указать учетные данные для автозаполнения
-        user_login = "Loretta Mosshart"
-        user_password = "lory_study"
+        user_login = ""
+        user_password = ""
 
         #user_login = input('Введите логин или почту: ')
         #user_password = input('Введите пароль: ')
