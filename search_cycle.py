@@ -1,31 +1,44 @@
+import time
+import re
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from exceptions import AuthorizationException, AuthorTableMoreOneRow
-from config import TEST_DATA
+from config import TEST_DATA, ARTICLES_TABLE_LOAD_DEBUG, TIMEOUT
 from authorization import authorize
 
 def search_cycle(browser):
-    """Основная функция работы с сайтом"""
+    """
+    Основная функция работы с сайтом, выполняющая поиск, сохранение статистики и нужной веб-страницы.
+     1. Проверка на авторизацию.
+     2. Поиск по Фамилии и SPIN-коду.
+     3. Проверка таблицы результатов поиска (должен быть один автор).
+     4. Сбор количества статей со страницы статистики автора.
+     5. Переход на страницу статей, выбор категорий, поиск, сохранение веб-страницы.
+    NB: В графу "Фамилия" можно указать полное ФИО, допустимо пропустить SPIN-код, но тогда может быть несколько авторов с одинаковым ФИО.
+    """
     try:
+        ### Проверки на случай повторных итераций в цикле main
+
+        # Проверяем, находимся ли на начальной странице, если нет — переходим
         if browser.current_url != 'https://www.elibrary.ru/authors.asp':
             browser.get('https://www.elibrary.ru/authors.asp')
             print("Перешли на начальную страницу.")
 
+        # Закрываем все лишние вкладки, оставляем только основную
         if len(browser.window_handles) > 1:
             for window_handle in browser.window_handles[1:]:
                 browser.switch_to.window(window_handle)
                 browser.close()
             browser.switch_to.window(browser.window_handles[0])
-            print("Закрыты лишние вкладки.")
 
         try:
             browser.find_element(By.ID, 'win_login')
             authorize(browser)
         except NoSuchElementException:
-            print("Пользователь уже авторизован.")
+            print("Пользователь авторизован.")
 
         surname_field = WebDriverWait(browser, 5).until(
             EC.presence_of_element_located((By.ID, 'surname'))
@@ -46,20 +59,26 @@ def search_cycle(browser):
 
         try:
             WebDriverWait(browser, 5).until(EC.alert_is_present())
+            alert_present = True
+        except TimeoutException:
+            alert_present = False
+
+        if alert_present:
             alert = browser.switch_to.alert
             print("Alert text:", alert.text)
             alert.dismiss()
             raise AuthorizationException("Ошибка авторизации. Для парсинга необходимо авторизироваться в eLibrary")
-        except TimeoutException:
-            print("Alert не появился, продолжаем выполнение...")
+
+        ### Работа с таблицей авторов
 
         authors_table = WebDriverWait(browser, 15).until(
             EC.presence_of_element_located((By.ID, 'restab'))
         )
         rows_in_table = authors_table.find_elements(By.TAG_NAME, 'tr')
-        print(f"Найдено строк в таблице: {len(rows_in_table)}")
         if len(rows_in_table) > 4:
             raise AuthorTableMoreOneRow()
+
+        ### Собираем количество статей на странице со статистикой
 
         statistical_page = WebDriverWait(browser, 10).until(
             EC.element_to_be_clickable((
@@ -68,7 +87,6 @@ def search_cycle(browser):
             ))
         )
         statistical_page.click()
-        print("Страница статистики загружена.")
 
         publications_total_elib = WebDriverWait(browser, 15).until(
             EC.presence_of_element_located((
@@ -93,7 +111,8 @@ def search_cycle(browser):
 
         browser.back()
 
-        print("Переходим на страницу с публикациями в РИНЦ...")
+        ### Переходим на страницу с публикациями в РИНЦ
+
         rinc_link = WebDriverWait(browser, 15).until(
             EC.element_to_be_clickable((
                 By.XPATH,
@@ -109,19 +128,17 @@ def search_cycle(browser):
             if window_handle != original_window:
                 browser.switch_to.window(window_handle)
 
-        print("Перешли на страницу списка публикаций в РИНЦ.")
-
-        types_header = WebDriverWait(browser, 15).until(
+        types_header = WebDriverWait(browser, 30).until(
             EC.element_to_be_clickable((By.ID, 'hdr_types'))
         )
         types_header.click()
 
-        checkbox_articles = WebDriverWait(browser, 15).until(
+        checkbox_articles = WebDriverWait(browser, 30).until(
             EC.element_to_be_clickable((By.ID, 'types_RAR'))
         )
         checkbox_articles.click()
 
-        cats_header = WebDriverWait(browser, 15).until(
+        cats_header = WebDriverWait(browser, 60).until(
             EC.element_to_be_clickable((By.ID, 'hdr_cats'))
         )
         cats_header.click()
@@ -140,8 +157,9 @@ def search_cycle(browser):
             {"id": "cats_scopus4", "name": "Статьи в журналах, входящих в Scopus (квартиль 4)"}
         ]
 
+        # Сайт иногда сохраняет состояние чекбоксов, нужно пройтись и проверить, что галочек нет
         for category in categories:
-            checkbox = WebDriverWait(browser, 5).until(
+            checkbox = WebDriverWait(browser, 10).until(
                 EC.element_to_be_clickable((By.ID, category["id"]))
             )
             if checkbox.is_selected():
@@ -151,19 +169,22 @@ def search_cycle(browser):
         for i, category in enumerate(categories, 1):
             print(f"{i}. {category['name']}")
 
+        # Получаем выбор пользователя
         selected_indices = input("Ваш выбор: ").split(" ")
         selected_indices = [int(i.strip()) - 1 for i in selected_indices if i.strip().isdigit()]
 
+        # Проверяем валидность ввода
         if not selected_indices or max(selected_indices) >= len(categories) or min(selected_indices) < 0:
             print("Неверный выбор категорий.")
             return None
 
+        # Кликаем на выбранные чекбоксы
         for index in selected_indices:
             checkbox_id = categories[index]["id"]
             checkbox = WebDriverWait(browser, 15).until(
                 EC.element_to_be_clickable((By.ID, checkbox_id))
             )
-            if not checkbox.is_selected():
+            if not checkbox.is_selected():  # Проверяем, не стоит ли галочка
                 checkbox.click()
 
         container = WebDriverWait(browser, 15).until(
@@ -178,13 +199,69 @@ def search_cycle(browser):
         browser.execute_script("arguments[0].click();", search_button)
 
         WebDriverWait(browser, 15).until(EC.staleness_of(old_table))
-        WebDriverWait(browser, 30).until(EC.presence_of_element_located((By.ID, 'restab')))
+        WebDriverWait(browser, 60).until(EC.presence_of_element_located((By.ID, 'restab')))
 
-        with open("page.html", "w", encoding="utf-8") as f:
-            f.write(browser.page_source)
-        print("Страница сохранена в page.html")
+        ### Определяем количество страниц
+        try:
+            WebDriverWait(browser, 10).until(EC.presence_of_element_located((By.ID, "pages")))
+            pages_panel = browser.find_element(By.ID, "pages")
+            page_links = pages_panel.find_elements(By.TAG_NAME, "a")
+            page_numbers = []
+            for link in page_links:
+                href = link.get_attribute('href')
+                if href and 'goto_page' in href:
+                    match = re.search(r'goto_page\((\d+)\)', href)
+                    if match:
+                        page_numbers.append(int(match.group(1)))
+            total_pages = max(page_numbers) if page_numbers else 1
+        except TimeoutException:
+            total_pages = 1
+        except NoSuchElementException:
+            total_pages = 1
 
-        return publications_total_elib, publications_rinc, publications_rinc_core
+        ### Сохранение всех страниц
+        for page in range(1, total_pages + 1):
+            if page > 1:
+                try:
+                    pages_panel = browser.find_element(By.ID, "pages")
+                    next_page_link = pages_panel.find_element(By.XPATH, f".//a[contains(@href, 'goto_page({page})')]")
+                    browser.execute_script("arguments[0].click();", next_page_link)
+                    WebDriverWait(browser, 15).until(EC.staleness_of(browser.find_element(By.ID, 'restab')))
+                    WebDriverWait(browser, 60).until(EC.presence_of_element_located((By.ID, 'restab')))
+                    WebDriverWait(browser, 30).until(
+                        EC.presence_of_element_located((By.XPATH, f"//div[@id='pages']//font[text()='{page}']"))
+                    )
+                except Exception as e:
+                    print(f"Ошибка при переходе на страницу {page}: {e}")
+                    break
+
+            if ARTICLES_TABLE_LOAD_DEBUG:
+                start_time = time.time()
+                poll_frequency = 1
+                stable_threshold = 3
+                last_row_count = 0
+                stable_count = 0
+
+                while time.time() - start_time < TIMEOUT:
+                    rows = browser.find_elements(By.XPATH, "//table[@id='restab']//tr[@valign='middle']")
+                    current_row_count = len(rows)
+                    print(f"Текущее количество строк на странице {page}: {current_row_count}")
+                    if current_row_count == last_row_count:
+                        stable_count += 1
+                        if stable_count >= stable_threshold:
+                            print(f"Таблица стабилизировалась с {current_row_count} строками на странице {page}")
+                            break
+                    else:
+                        stable_count = 0
+                    last_row_count = current_row_count
+                    time.sleep(poll_frequency)
+            else:
+                time.sleep(TIMEOUT)
+
+            with open(f"page_{page}.html", "w", encoding="utf-8") as f:
+                f.write(browser.page_source)
+
+        return publications_total_elib, publications_rinc, publications_rinc_core, total_pages
 
     except AuthorizationException:
         raise

@@ -5,7 +5,7 @@ class AuthorizationException(Exception):
         super().__init__(self.message)
 
 class AuthorTableMoreOneRow(Exception):
-    """Исключение, возникающее, если найдено слишком много авторов."""
+    """Исключение, возникающее, если найдено более одного автора."""
     def __init__(self, message="Найдено более одного автора по данному запросу. Уточните полное ФИО или код автора"):
         self.message = message
         super().__init__(self.message)

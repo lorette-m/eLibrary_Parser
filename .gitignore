@@ -1,3 +1,5 @@
 /.idea
 page.html
 result.csv
+*.html
+/__pycache__
