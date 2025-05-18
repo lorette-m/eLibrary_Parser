@@ -347,13 +347,11 @@ def parse_elibrary_html(html_path, csv_path, publications_total_elib, publicatio
             print(f"Пропущена строка с недостаточным количеством ячеек: {len(cells)}")
             continue
 
-        # Номер статьи
+        # Номер статьи - убираем точку в конце
         number_cell = cells[0].find('font', color="#00008f")
-        print(f"number_cell for row: {number_cell}")  # Отладка
         number = number_cell.find('b').text.strip() if number_cell and number_cell.find('b') else ''
-        print(f"Extracted number: '{number}'")  # Отладка
-        if not number:
-            print(f"Номер не найден в строке, пытаемся продолжить")
+        if number.endswith('.'):
+            number = number[:-1].strip()
 
         # Основная информация
         info_cell = cells[1]
@@ -364,40 +362,33 @@ def parse_elibrary_html(html_path, csv_path, publications_total_elib, publicatio
         if title_tag and title_tag.find('b'):
             title = title_tag.find('b').text.strip()
         else:
-            # Проверяем <b><font color="#00008f">...</font></b> для альтернативного названия
             alt_title_tag = info_cell.find('b')
             if alt_title_tag and alt_title_tag.find('font', color="#00008f"):
                 title = alt_title_tag.find('font', color="#00008f").text.strip()
-            else:
-                print(f"Название не найдено в строке с номером {number or 'unknown'}, оставляем пустым")
 
         # Авторы (только из <i>)
         authors = ''
         font_tags = info_cell.find_all('font', color="#00008f")
-        print(f"font_tags for row {number or 'unknown'}: {[str(tag)[:100] for tag in font_tags]}")  # Отладка
         for font_tag in font_tags:
             authors_tag = font_tag.find('i')
             if authors_tag:
                 authors = authors_tag.text.strip()
                 break
-        if not authors:
-            print(f"Авторы не найдены в строке с номером {number or 'unknown'}, оставляем пустым")
 
-        # Журнал и дополнительная информация
+        # Журнал и дополнительная информация - убираем точки с обоих сторон
         journal = ''
         additional_info = ''
         for font_tag in font_tags:
             journal_tag = font_tag.find('a', href=lambda x: x and ('contents.asp?id=' in str(x) or 'contents.asp?titleid=' in str(x)) and '&selid' not in str(x))
-            print(f"journal_tag for font_tag: {journal_tag}")  # Отладка
             if journal_tag:
                 journal = journal_tag.text.strip()
                 full_text = font_tag.get_text(separator=" ").strip()
                 journal_text = journal_tag.text.strip()
                 start_pos = full_text.find(journal_text) + len(journal_text)
                 additional_info = full_text[start_pos:].strip()
+                # Убираем точки с обоих сторон
+                additional_info = additional_info.strip('. ')
                 break
-        if not journal:
-            print(f"Журнал не найден в строке с номером {number or 'unknown'}, оставляем пустым")
 
         # Записываем строку, если есть хотя бы одно поле
         if journal or authors or title or additional_info:
@@ -408,8 +399,6 @@ def parse_elibrary_html(html_path, csv_path, publications_total_elib, publicatio
                 'journal': journal,
                 'additional_info': additional_info
             })
-        else:
-            print(f"Пропущена строка с номером {number or 'unknown'}: нет ни журнала, ни авторов, ни названия, ни доп. информации")
 
     if not articles:
         print("Внимание: не удалось извлечь ни одной статьи из таблицы.")
