@@ -6,7 +6,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from exceptions import AuthorizationException, AuthorTableMoreOneRow
-from config import TEST_DATA, ARTICLES_TABLE_LOAD_DEBUG, TIMEOUT
+from config import ARTICLES_TABLE_LOAD_DEBUG, TIMEOUT, AUTHOR_DATA, USE_AUTHOR_FROM_CONFIG
 from authorization import authorize
 
 def search_cycle(browser):
@@ -49,8 +49,16 @@ def search_cycle(browser):
         )
         code_field.clear()
 
-        surname_field.send_keys(TEST_DATA['surname'])
-        code_field.send_keys(TEST_DATA['code'] + Keys.RETURN)
+        if USE_AUTHOR_FROM_CONFIG:
+            surname = AUTHOR_DATA['surname']
+            code = AUTHOR_DATA['code']
+        else:
+            print("Примечание: если не знаете SPIN-код, можете ввести ФИО — программа сработает если будет найдено не более одного автора.")
+            surname = input("Введите фамилию автора: ")
+            code = input("Введите SPIN-код: ")
+
+        surname_field.send_keys(surname)
+        code_field.send_keys(code + Keys.RETURN)
 
         share = WebDriverWait(browser, 10).until(
            EC.element_to_be_clickable((By.CLASS_NAME, 'butred'))

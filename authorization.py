@@ -3,7 +3,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from exceptions import AuthorizationException
-from config import TEST_DATA
+from config import LOGIN_DATA, USE_LOGIN_FROM_CONFIG
 
 def authorize(browser):
     """
@@ -17,13 +17,18 @@ def authorize(browser):
         login_field = login_container.find_element(By.ID, 'login')
         password_field = login_container.find_element(By.ID, 'password')
 
-        # user_login = input('Введите логин или почту: ')
-        # user_password = input('Введите пароль: ')
+        if USE_LOGIN_FROM_CONFIG:
+            login = LOGIN_DATA['login']
+            password = LOGIN_DATA['password']
+        else:
+            login = input("Введите логин или почту: ")
+            password = input("Введите пароль: ")
 
         login_field.clear()
-        login_field.send_keys(TEST_DATA['login'])
+        login_field.send_keys(login)
         password_field.clear()
-        password_field.send_keys(TEST_DATA['password'])
+        password_field.send_keys(password)
+
 
         # Чекбокс "Запомнить меня"
         checkbox = WebDriverWait(browser, 10).until(
