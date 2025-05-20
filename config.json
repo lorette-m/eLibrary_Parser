@@ -1,0 +1,23 @@
+{
+    "ARTICLES_TABLE_LOAD_DEBUG": false,
+    "TIMEOUT": 10,
+    "USE_LOGIN_FROM_CONFIG": false,
+    "LOGIN_DATA": {
+        "login": "",
+        "password": ""
+    },
+    "USE_AUTHOR_FROM_CONFIG": false,
+    "AUTHOR_DATA": {
+        "surname": "",
+        "code": ""
+    },
+    "BROWSER_GUI_ENABLED": true,
+    "WINDOW_SIZE": [
+        768,
+        918
+    ],
+    "WINDOW_POSITION": [
+        768,
+        0
+    ]
+}
