@@ -4,9 +4,11 @@ from exceptions import AuthorizationException, AuthorTableMoreOneRow
 from search_cycle import search_cycle
 from html_parser import parse_elibrary_html
 import glob
+from pynput import keyboard
+import sys
 
-def cleanup_files():
-    """Удаление временных файлов page_*.html и result.csv"""
+def cleanup_html():
+    """Удаление сохраненных html страниц."""
     for file in glob.glob("page_*.html"):
         try:
             if os.path.exists(file):
@@ -14,6 +16,8 @@ def cleanup_files():
         except Exception as e:
             print(f"Ошибка при удалении файла {file}: {e}")
 
+def cleanup_csv():
+    """Удаление csv файлов с результатами парсинга."""
     csv_file = "result.csv"
     try:
         if os.path.exists(csv_file):
@@ -22,7 +26,8 @@ def cleanup_files():
         print(f"Ошибка при удалении файла {csv_file}: {e}")
 
 def main():
-    cleanup_files()
+    cleanup_html()
+    cleanup_csv()
     browser = setup_browser()
 
     LOOP_LIMIT = 3
@@ -48,9 +53,20 @@ def main():
         loop_iteration += 1
     else:
         print(f"Достигнут лимит попыток ({LOOP_LIMIT}).")
-    
+
+    cleanup_html()
     # browser.quit()
     print("Программа выполнена.")
+    print("Нажмите любую клавишу для завершения программы..")
+
+    def on_press(key):
+        return False
+
+    with keyboard.Listener(on_press=on_press) as listener:
+        listener.join()
+
+    browser.quit()
+    sys.exit(0)
 
 if __name__ == "__main__":
     main()

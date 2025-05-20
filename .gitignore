@@ -3,3 +3,6 @@ page.html
 result.csv
 *.html
 /__pycache__
+/build
+*.spec
+/dist
