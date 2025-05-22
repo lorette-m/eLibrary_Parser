@@ -136,10 +136,14 @@ def search_cycle(browser):
             if window_handle != original_window:
                 browser.switch_to.window(window_handle)
 
+        WebDriverWait(browser, 20).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+
         types_header = WebDriverWait(browser, 30).until(
             EC.element_to_be_clickable((By.ID, 'hdr_types'))
         )
         types_header.click()
+
+        time.sleep(2)
 
         checkbox_articles = WebDriverWait(browser, 30).until(
             EC.element_to_be_clickable((By.ID, 'types_RAR'))
@@ -167,7 +171,7 @@ def search_cycle(browser):
 
         # Сайт иногда сохраняет состояние чекбоксов, нужно пройтись и проверить, что галочек нет
         for category in categories:
-            checkbox = WebDriverWait(browser, 10).until(
+            checkbox = WebDriverWait(browser, 30).until(
                 EC.element_to_be_clickable((By.ID, category["id"]))
             )
             if checkbox.is_selected():
